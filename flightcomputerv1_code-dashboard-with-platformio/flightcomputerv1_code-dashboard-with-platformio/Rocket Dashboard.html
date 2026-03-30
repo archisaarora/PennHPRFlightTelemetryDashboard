@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FLIGHTCOMP // TELEMETRY OPS</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=Rajdhani:wght@400;600;700&display=swap');
+:root{
+  --navy:#0a1540;--crimson:#8b0000;--cr2:#cc0000;--white:#f0f4ff;
+  --black:#07090f;--royal:#2d3a8c;--royal2:#4a5bbf;
+  --bg:#07090f;--panel:#0c1020;--border:#1a2550;
+  --text:#c8d4ff;--dim:#3a4870;
+  --rx:#cc3333;--ry:#2d8bcc;--rz:#b89a00;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.04) 3px,rgba(0,0,0,0.04) 4px);pointer-events:none;z-index:9997;}
+
+/* HEADER */
+header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:50px;background:var(--navy);border-bottom:2px solid var(--crimson);position:relative;}
+header::after{content:'';position:absolute;bottom:-5px;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent 0%,var(--cr2) 30%,transparent 100%);opacity:.35;}
+.logo{font-family:'Bebas Neue';font-size:1.4rem;letter-spacing:.3em;color:var(--white);text-shadow:0 0 18px rgba(204,51,51,.6);}
+.logo em{color:var(--cr2);font-style:normal;}
+.hright{display:flex;align-items:center;gap:18px;}
+.hstat{display:flex;align-items:center;gap:6px;font-family:'Share Tech Mono';font-size:.63rem;letter-spacing:.1em;color:var(--dim);}
+.dot{width:8px;height:8px;border-radius:50%;background:#222;flex-shrink:0;}
+.dot.live{background:var(--cr2);box-shadow:0 0 10px var(--cr2);animation:pulse 1.5s ease-in-out infinite;}
+.dot.ws{background:#2d8bcc;box-shadow:0 0 8px #2d8bcc;}
+@keyframes pulse{0%,100%{box-shadow:0 0 6px var(--cr2);}50%{box-shadow:0 0 16px var(--cr2),0 0 28px rgba(204,0,0,.3);}}
+#hclock{font-family:'Share Tech Mono';font-size:.78rem;color:var(--cr2);letter-spacing:.15em;}
+
+/* NAV */
+.nav{display:flex;align-items:center;background:var(--black);border-bottom:1px solid var(--border);padding:0 18px;gap:0;}
+.tab{font-family:'Bebas Neue';font-size:.9rem;letter-spacing:.22em;padding:10px 20px;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;}
+.tab:hover{color:var(--text);}
+.tab.on{color:var(--white);border-bottom-color:var(--cr2);}
+.cbar{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.btn{font-family:'Share Tech Mono';font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;background:transparent;cursor:pointer;padding:5px 13px;border:1px solid var(--royal);color:var(--royal2);transition:all .15s;}
+.btn:hover{background:rgba(45,58,140,.2);}
+.btn.dc{border-color:var(--cr2);color:var(--cr2);}
+.btn.dc:hover{background:rgba(139,0,0,.2);}
+.twrap{display:flex;align-items:center;gap:6px;font-family:'Share Tech Mono';font-size:.6rem;color:var(--dim);}
+.tog{width:40px;height:18px;background:#111828;border:1px solid var(--border);border-radius:9px;cursor:pointer;position:relative;transition:background .2s;}
+.tog::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--dim);transition:all .2s;}
+.tog.on{background:rgba(45,100,180,.25);border-color:#2d8bcc;}
+.tog.on::after{left:24px;background:#2d8bcc;box-shadow:0 0 5px #2d8bcc;}
+select.bsel,input.wsin{font-family:'Share Tech Mono';font-size:.62rem;background:var(--panel);border:1px solid var(--border);color:var(--text);padding:4px 7px;}
+input.wsin{width:185px;display:none;}
+input.wsin.show{display:block;}
+#cstat{font-family:'Share Tech Mono';font-size:.6rem;color:var(--dim);}
+
+/* PAGE */
+.page{display:none;}
+.page.on{display:block;}
+
+/* TELEMETRY GRID */
+.tgrid{display:grid;grid-template-columns:1.1fr 1fr 1fr;grid-template-rows:auto auto;gap:10px;padding:10px;max-width:1700px;margin:0 auto;}
+
+/* PANEL */
+.pnl{background:var(--panel);border:1px solid var(--border);border-top:2px solid var(--crimson);position:relative;overflow:hidden;}
+.pnl::before{content:'';position:absolute;top:0;left:0;right:0;height:36px;background:linear-gradient(180deg,rgba(139,0,0,.07),transparent);pointer-events:none;}
+.ph{padding:7px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--navy);}
+.pt{font-family:'Bebas Neue';font-size:.8rem;letter-spacing:.22em;color:var(--white);}
+.ptag{font-family:'Share Tech Mono';font-size:.57rem;color:var(--dim);letter-spacing:.1em;}
+.pb{padding:11px 13px;}
+
+/* ROCKET */
+.rpnl{grid-column:1;grid-row:1/3;}
+#rc{width:100%;height:390px;display:block;cursor:grab;}
+#rc:active{cursor:grabbing;}
+.erow{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:9px 13px 13px;border-top:1px solid var(--border);}
+.ev .el{font-family:'Share Tech Mono';font-size:.57rem;color:var(--dim);letter-spacing:.13em;}
+.ev .en{font-family:'Bebas Neue';font-size:1.45rem;color:var(--white);text-shadow:0 0 10px rgba(200,51,51,.4);}
+.ev{text-align:center;}
+
+/* AXIS ROWS */
+.ars{display:flex;flex-direction:column;gap:7px;margin-bottom:11px;}
+.ar{display:flex;align-items:center;gap:7px;}
+.al{font-family:'Share Tech Mono';font-size:.63rem;font-weight:700;width:22px;flex-shrink:0;}
+.al.x{color:var(--rx);} .al.y{color:var(--ry);} .al.z{color:var(--rz);}
+.atr{flex:1;height:3px;background:#0a1020;border-radius:2px;position:relative;}
+.af{position:absolute;top:0;bottom:0;border-radius:2px;transition:width .08s,left .08s;}
+.af.x{background:var(--rx);box-shadow:0 0 5px var(--rx);}
+.af.y{background:var(--ry);box-shadow:0 0 5px var(--ry);}
+.af.z{background:var(--rz);box-shadow:0 0 5px var(--rz);}
+.an{font-family:'Share Tech Mono';font-size:.68rem;width:58px;text-align:right;flex-shrink:0;}
+
+/* SPARKLINES */
+canvas.sp{width:100%;height:48px;display:block;border:1px solid #0a1428;}
+.sl{font-family:'Share Tech Mono';font-size:.55rem;color:var(--dim);letter-spacing:.1em;margin-bottom:1px;margin-top:7px;}
+
+/* BARO */
+.bbn{font-family:'Bebas Neue';font-size:2.8rem;color:var(--white);text-align:center;text-shadow:0 0 18px rgba(45,58,140,.7);letter-spacing:.04em;}
+.bbu{font-size:.95rem;color:var(--dim);}
+.bsub{display:flex;gap:10px;justify-content:space-between;border-top:1px solid var(--border);padding-top:9px;margin-top:9px;}
+.bs{flex:1;text-align:center;}
+.bs .bl{font-family:'Share Tech Mono';font-size:.57rem;color:var(--dim);letter-spacing:.12em;}
+.bs .bv{font-family:'Bebas Neue';font-size:1.25rem;color:var(--royal2);}
+
+/* DIAGNOSTICS PAGE */
+.dgrid{display:grid;grid-template-columns:1.4fr 1fr;grid-template-rows:auto auto;gap:10px;padding:10px;max-width:1700px;margin:0 auto;}
+.dgrid .pnl{border-top-color:var(--royal);}
+.tpnl{grid-column:1;grid-row:1/3;}
+#tc{width:100%;height:560px;display:block;cursor:grab;}
+#tc:active{cursor:grabbing;}
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:9px;}
+.sb{background:var(--navy);border:1px solid var(--border);padding:8px 11px;text-align:center;}
+.sb .sl2{font-family:'Share Tech Mono';font-size:.57rem;color:var(--dim);letter-spacing:.11em;}
+.sb .sv{font-family:'Bebas Neue';font-size:1.35rem;color:var(--white);}
+.sb .sv.r{color:var(--rx);text-shadow:0 0 9px rgba(204,51,51,.5);}
+.sb .sv.b{color:var(--royal2);text-shadow:0 0 9px rgba(45,58,140,.5);}
+.dw{font-family:'Share Tech Mono';font-size:.62rem;color:#cc3333;background:rgba(139,0,0,.1);border:1px solid rgba(204,0,0,.2);border-left:3px solid #cc0000;padding:6px 9px;margin-bottom:5px;}
+.dok{font-family:'Share Tech Mono';font-size:.62rem;color:#2d8bcc;background:rgba(45,58,140,.1);border:1px solid rgba(45,58,140,.2);border-left:3px solid #2d8bcc;padding:6px 9px;margin-bottom:5px;}
+
+/* SETTINGS */
+.swrap{max-width:820px;margin:28px auto;padding:0 18px;}
+.ssec{background:var(--panel);border:1px solid var(--border);border-top:2px solid var(--royal);margin-bottom:14px;}
+.ssec .ph{background:var(--navy);}
+.sbody{padding:18px;}
+.srow{display:flex;align-items:flex-start;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);font-family:'Rajdhani';font-weight:600;font-size:.92rem;gap:20px;}
+.srow:last-child{border-bottom:none;}
+.sdesc{font-size:.73rem;color:var(--dim);font-weight:400;margin-top:2px;}
+.sctl input,.sctl select{font-family:'Share Tech Mono';font-size:.67rem;background:#0a1020;border:1px solid var(--border);color:var(--text);padding:5px 9px;min-width:190px;}
+.stepsbox{background:#0a1020;border:1px solid var(--border);border-left:3px solid var(--royal);padding:13px 15px;margin-top:12px;font-family:'Share Tech Mono';font-size:.65rem;color:var(--text);line-height:1.85;}
+.stepsbox h4{color:var(--royal2);letter-spacing:.14em;margin-bottom:8px;font-family:'Bebas Neue';font-size:.85rem;}
+.stepsbox .sn{color:var(--cr2);margin-right:5px;}
+.stepsbox code{background:#141e38;padding:1px 5px;color:#7ab0ff;border-radius:2px;font-size:.62rem;}
+.wbox{background:rgba(139,0,0,.1);border:1px solid rgba(204,0,0,.2);border-left:3px solid var(--cr2);padding:9px 13px;margin-top:10px;font-family:'Share Tech Mono';font-size:.63rem;color:#ff9999;line-height:1.75;}
+
+@media(max-width:1100px){
+  .tgrid{grid-template-columns:1fr 1fr;}
+  .rpnl{grid-column:1/3;grid-row:1;}
+  .dgrid{grid-template-columns:1fr;}
+  .tpnl{grid-row:1;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">FLIGHT<em>COMP</em> // TELEMETRY OPS</div>
+  <div class="hright">
+    <div class="hstat"><div class="dot" id="ldot"></div><span id="llbl">OFFLINE</span></div>
+    <div class="hstat" id="ctpill" style="display:none"><div class="dot" id="ctdot"></div><span id="ctlbl">WIRED</span></div>
+    <div class="hstat">PKT/S: <span id="pktr">0.0</span></div>
+    <div id="hclock">T+00:00.0</div>
+  </div>
+</header>
+
+<div class="nav">
+  <div class="tab on" onclick="goPage('telem',this)">TELEMETRY</div>
+  <div class="tab" onclick="goPage('diag',this)">DIAGNOSTICS</div>
+  <div class="tab" onclick="goPage('settings',this)">SETTINGS</div>
+  <div class="cbar">
+    <div class="twrap">WIRED<div class="tog" id="ctog" onclick="flipConn()"></div>WIRELESS</div>
+    <select class="bsel" id="bsel"><option value="9600">9600</option><option value="57600">57600</option><option value="115200" selected>115200</option></select>
+    <input class="wsin" id="wsin" placeholder="ws://192.168.4.1:81">
+    <button class="btn" id="cbtn" onclick="doConn()">⬡ CONNECT</button>
+    <span id="cstat">NO PORT</span>
+  </div>
+</div>
+
+<!-- TELEMETRY PAGE -->
+<div class="page on" id="page-telem">
+<div class="tgrid">
+
+  <div class="pnl rpnl">
+    <div class="ph"><span class="pt">3D ATTITUDE</span><span class="ptag" id="draghint">DRAG TO INSPECT · GYRO INTEGRATED</span></div>
+    <canvas id="rc"></canvas>
+    <div style="padding:5px 13px;border-top:1px solid #0f1d30;display:flex;gap:8px;">
+      <button class="btn" onclick="resetQ()" style="font-size:.58rem;padding:3px 9px;">⊕ SET UPRIGHT</button>
+      <button class="btn" onclick="zeroAll()" style="font-size:.58rem;padding:3px 9px;">↺ ZERO ANGLES</button>
+    </div>
+    <div class="erow">
+      <div class="ev"><div class="el">ROLL</div><div class="en" id="eroll">0.0°</div></div>
+      <div class="ev"><div class="el">PITCH</div><div class="en" id="epitch">0.0°</div></div>
+      <div class="ev"><div class="el">YAW</div><div class="en" id="eyaw">0.0°</div></div>
+    </div>
+  </div>
+
+  <div class="pnl" style="grid-column:2;grid-row:1">
+    <div class="ph"><span class="pt">GYROSCOPE</span><span class="ptag">±2000 DPS · BMI088</span></div>
+    <div class="pb">
+      <div class="ars">
+        <div class="ar"><span class="al x">GX</span><div class="atr"><div class="af x" id="gxb" style="left:50%;width:0"></div></div><span class="an" id="gxv">0.00</span></div>
+        <div class="ar"><span class="al y">GY</span><div class="atr"><div class="af y" id="gyb" style="left:50%;width:0"></div></div><span class="an" id="gyv">0.00</span></div>
+        <div class="ar"><span class="al z">GZ</span><div class="atr"><div class="af z" id="gzb" style="left:50%;width:0"></div></div><span class="an" id="gzv">0.00</span></div>
+      </div>
+      <div class="sl">GX °/s</div><canvas class="sp" id="spGX"></canvas>
+      <div class="sl">GY °/s</div><canvas class="sp" id="spGY"></canvas>
+      <div class="sl">GZ °/s</div><canvas class="sp" id="spGZ"></canvas>
+    </div>
+  </div>
+
+  <div class="pnl" style="grid-column:3;grid-row:1">
+    <div class="ph"><span class="pt">ACCELEROMETER</span><span class="ptag">±6G · m/s²</span></div>
+    <div class="pb">
+      <div class="ars">
+        <div class="ar"><span class="al x">AX</span><div class="atr"><div class="af x" id="axb" style="left:50%;width:0"></div></div><span class="an" id="axv">0.000</span></div>
+        <div class="ar"><span class="al y">AY</span><div class="atr"><div class="af y" id="ayb" style="left:50%;width:0"></div></div><span class="an" id="ayv">0.000</span></div>
+        <div class="ar"><span class="al z">AZ</span><div class="atr"><div class="af z" id="azb" style="left:50%;width:0"></div></div><span class="an" id="azv">0.000</span></div>
+      </div>
+      <div class="sl">AX m/s²</div><canvas class="sp" id="spAX"></canvas>
+      <div class="sl">AY m/s²</div><canvas class="sp" id="spAY"></canvas>
+      <div class="sl">AZ m/s²</div><canvas class="sp" id="spAZ"></canvas>
+    </div>
+  </div>
+
+  <div class="pnl" style="grid-column:2;grid-row:2">
+    <div class="ph"><span class="pt">MAGNETOMETER</span><span class="ptag">LIS2MDL · HEADING</span></div>
+    <div class="pb">
+      <canvas id="cmpC" width="130" height="130" style="display:block;margin:0 auto 8px;"></canvas>
+      <div id="hdgBig" style="font-family:'Bebas Neue';font-size:1.9rem;color:var(--royal2);text-align:center;text-shadow:0 0 14px rgba(45,58,140,.7);letter-spacing:.1em;">---°</div>
+      <div class="ars" style="margin-top:10px">
+        <div class="ar"><span class="al x">MX</span><div class="atr"><div class="af x" id="mxb" style="left:50%;width:0"></div></div><span class="an" id="mxv">0</span></div>
+        <div class="ar"><span class="al y">MY</span><div class="atr"><div class="af y" id="myb" style="left:50%;width:0"></div></div><span class="an" id="myv">0</span></div>
+        <div class="ar"><span class="al z">MZ</span><div class="atr"><div class="af z" id="mzb" style="left:50%;width:0"></div></div><span class="an" id="mzv">0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pnl" style="grid-column:3;grid-row:2">
+    <div class="ph"><span class="pt">BAROMETER // ALT</span><span class="ptag">MS5607</span></div>
+    <div class="pb">
+      <div style="font-family:'Share Tech Mono';font-size:.56rem;color:var(--dim);letter-spacing:.14em;text-align:center;margin-bottom:3px;">EST. ALTITUDE AGL</div>
+      <div class="bbn"><span id="altv">0.0</span><span class="bbu"> m</span></div>
+      <div class="bsub">
+        <div class="bs"><div class="bl">PRESSURE</div><div class="bv" id="presv">---</div><div class="bl">kPa</div></div>
+        <div class="bs"><div class="bl">TEMPERATURE</div><div class="bv" id="tempv">---</div><div class="bl">°C</div></div>
+      </div>
+      <div class="sl" style="margin-top:9px">ALTITUDE HISTORY</div>
+      <canvas class="sp" id="spAlt" style="height:58px;"></canvas>
+    </div>
+  </div>
+
+</div></div>
+
+<!-- DIAGNOSTICS PAGE -->
+<div class="page" id="page-diag">
+<div class="dgrid">
+
+  <div class="pnl tpnl">
+    <div class="ph"><span class="pt">FLIGHT TRAJECTORY // 3D PATH</span><span class="ptag">DRAG TO ROTATE · DEAD-RECKONING FROM ACCEL</span></div>
+    <canvas id="tc"></canvas>
+    <div style="padding:7px 13px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;">
+      <button class="btn" onclick="clearTraj()" style="font-size:.58rem;padding:3px 9px;">✕ CLEAR</button>
+      <button class="btn" onclick="resetView()" style="font-size:.58rem;padding:3px 9px;">◎ RESET VIEW</button>
+      <span style="font-family:'Share Tech Mono';font-size:.58rem;color:var(--dim);margin-left:auto;" id="tpts">0 pts</span>
+    </div>
+  </div>
+
+  <div class="pnl" style="grid-column:2;grid-row:1">
+    <div class="ph"><span class="pt">FLIGHT STATISTICS</span><span class="ptag">COMPUTED REALTIME</span></div>
+    <div class="pb">
+      <div class="sgrid">
+        <div class="sb"><div class="sl2">MAX ALTITUDE</div><div class="sv b" id="smaxAlt">0.0 m</div></div>
+        <div class="sb"><div class="sl2">MAX ACCEL</div><div class="sv r" id="smaxAcc">0.0 m/s²</div></div>
+        <div class="sb"><div class="sl2">MAX SPEED (est)</div><div class="sv" id="smaxSpd">0.0 m/s</div></div>
+        <div class="sb"><div class="sl2">MAX G-FORCE</div><div class="sv r" id="smaxG">0.0 g</div></div>
+        <div class="sb"><div class="sl2">ELAPSED TIME</div><div class="sv" id="stime">0.0 s</div></div>
+        <div class="sb"><div class="sl2">AVG YAW RATE</div><div class="sv" id="savgY">0.0 °/s</div></div>
+      </div>
+      <div class="sl">VERTICAL SPEED (m/s)</div><canvas class="sp" id="spVS" style="height:52px;"></canvas>
+      <div class="sl" style="margin-top:9px;">G-FORCE HISTORY</div><canvas class="sp" id="spG" style="height:52px;"></canvas>
+    </div>
+  </div>
+
+  <div class="pnl" style="grid-column:2;grid-row:2">
+    <div class="ph"><span class="pt">SENSOR DIAGNOSTICS</span><span class="ptag">AUTO ANALYSIS</span></div>
+    <div class="pb" id="dpanel"><div class="dok">✓ SYSTEM IDLE — AWAITING DATA</div></div>
+  </div>
+
+</div></div>
+
+<!-- SETTINGS PAGE -->
+<div class="page" id="page-settings">
+<div class="swrap">
+
+  <div class="ssec">
+    <div class="ph"><span class="pt">CONNECTION MODE</span></div>
+    <div class="sbody">
+      <div class="srow">
+        <div>WIRED — USB Serial<div class="sdesc">Direct USB via Web Serial API. Requires Chrome or Edge. Use for bench testing alongside PlatformIO.</div></div>
+        <div class="sctl"><select onchange="document.getElementById('bsel').value=this.value"><option value="9600">9600 baud</option><option value="57600">57600 baud</option><option value="115200" selected>115200 baud</option></select></div>
+      </div>
+      <div class="srow">
+        <div>WIRELESS — WebSocket<div class="sdesc">ESP32 hosts a WebSocket server over WiFi AP. Dashboard connects as WS client. No cable needed in-flight.</div></div>
+        <div class="sctl"><input type="text" id="wsUrlSet" value="ws://192.168.4.1:81" onchange="document.getElementById('wsin').value=this.value" style="min-width:210px;font-family:'Share Tech Mono';font-size:.67rem;background:#0a1020;border:1px solid var(--border);color:var(--text);padding:5px 9px;"></div>
+      </div>
+      <div class="stepsbox">
+        <h4>⬡ WIRELESS SETUP GUIDE</h4>
+        <div><span class="sn">1.</span>In <code>platformio.ini</code>, add: <code>lib_deps = Links2004/WebSockets @ ^2.4.0</code></div>
+        <div><span class="sn">2.</span>In firmware: <code>#include &lt;WiFi.h&gt;</code> and <code>#include &lt;WebSocketsServer.h&gt;</code></div>
+        <div><span class="sn">3.</span>In <code>setup()</code>: <code>WiFi.softAP("RocketAP","launch123"); webSocket.begin(); webSocket.onEvent(wsEvent);</code></div>
+        <div><span class="sn">4.</span>In loop event handler, call <code>webSocket.loop();</code> each iteration.</div>
+        <div><span class="sn">5.</span>Replace <code>Serial.println(line)</code> with <code>webSocket.broadcastTXT(line);</code> — keep the same <code>&gt;KEY:val</code> format, no other changes needed.</div>
+        <div><span class="sn">6.</span>Connect laptop to WiFi <code>RocketAP</code>, set URL to <code>ws://192.168.4.1:81</code>, flip the toggle, hit Connect.</div>
+        <div><span class="sn">7.</span>For longer range: use ESP32 with external antenna, or a ground-side ESP32 bridging UART→WiFi as a relay.</div>
+      </div>
+      <div class="wbox">
+        ⚠ CAVEATS &amp; GOTCHAS:<br>
+        · Web Serial requires Chrome or Edge — Firefox does not support it.<br>
+        · WebSocket from browser requires <code>ws://</code> (not <code>wss://</code>) and the page must be served over plain HTTP, not HTTPS. Use <code>python -m http.server 8080</code> in the dashboard folder.<br>
+        · Metal airframe significantly attenuates 2.4GHz WiFi. Route an external antenna or use a fiberglass nose section.<br>
+        · Wireless adds ~1ms latency. At 10Hz packet rate this is negligible.<br>
+        · Close PlatformIO's Serial Monitor before opening the wired connection — only one process can hold the COM port.<br>
+        · Both modes parse the identical line format — switching modes requires only the dashboard toggle, zero firmware changes.
+      </div>
+    </div>
+  </div>
+
+  <div class="ssec">
+    <div class="ph"><span class="pt">DISPLAY SETTINGS</span></div>
+    <div class="sbody">
+      <div class="srow">
+        <div>Reference Pressure P₀<div class="sdesc">Used to compute altitude AGL. "AUTO" reads current sensor value.</div></div>
+        <div class="sctl" style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="p0in" value="1013.25" style="min-width:90px;font-family:'Share Tech Mono';font-size:.67rem;background:#0a1020;border:1px solid var(--border);color:var(--text);padding:5px 9px;">
+          <span style="font-family:'Share Tech Mono';font-size:.6rem;color:var(--dim)">hPa</span>
+          <button class="btn" onclick="autoP0()" style="font-size:.58rem;padding:3px 9px;">AUTO</button>
+        </div>
+      </div>
+      <div class="srow">
+        <div>Trajectory sample rate<div class="sdesc">How often to plot a position point on the 3D flight path.</div></div>
+        <div class="sctl">
+          <select id="trajR" style="font-family:'Share Tech Mono';font-size:.67rem;background:#0a1020;border:1px solid var(--border);color:var(--text);padding:5px;">
+            <option value="1">Every packet (~10Hz)</option>
+            <option value="5" selected>Every 5 packets (~2Hz)</option>
+            <option value="10">Every 10 (~1Hz)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div></div>
+
+<script>
+// =========================================================
+//  STATE
+// =========================================================
+const S = {
+  ax:0,ay:0,az:0, gx:0,gy:0,gz:0, mx:0,my:0,mz:0, T:20, P:101325,
+  q:[1,0,0,0],    // quaternion w,x,y,z
+  roll:0,pitch:0,yaw:0,
+  vx:0,vy:0,vz:0, px:0,py:0,pz:0
+};
+const N=120;
+const H={ax:[],ay:[],az:[],gx:[],gy:[],gz:[],alt:[],g:[],vs:[]};
+for(const k in H) H[k]=new Array(N).fill(0);
+
+let P0=null, startTime=Date.now(), lastTs=performance.now();
+let pktCount=0, pktTs=Date.now();
+let trajPts=[], trajN=0;
+let stats={mAlt:0,mAcc:0,mSpd:0,mG:0,ySum:0,yN:0};
+
+// Connection
+let connMode='wired', sPort=null, sReader=null, ws=null, lbuf='';
+
+// Trajectory view
+let tvx=-0.4, tvy=0.5, tdrag=false, tdlast=null;
+
+// Rocket drag override
+let rdrag=false, rdlast=null, rdq=[1,0,0,0];
+
+// =========================================================
+//  PAGE NAV
+// =========================================================
+function goPage(name,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.getElementById('page-'+name).classList.add('on');
+  el.classList.add('on');
+}
+
+// =========================================================
+//  CONNECTION
+// =========================================================
+function flipConn(){
+  const tog=document.getElementById('ctog');
+  const wi=document.getElementById('wsin');
+  const bs=document.getElementById('bsel');
+  if(connMode==='wired'){connMode='wireless';tog.classList.add('on');wi.classList.add('show');bs.style.display='none';}
+  else{connMode='wired';tog.classList.remove('on');wi.classList.remove('show');bs.style.display='';}
+  if(sPort||ws) doDisc();
+}
+
+async function doConn(){
+  if(sPort||ws){doDisc();return;}
+  if(connMode==='wired') await connSerial();
+  else connWS();
+}
+
+async function connSerial(){
+  if(!('serial' in navigator)){setStat('WEB SERIAL UNSUPPORTED — USE CHROME/EDGE');return;}
+  try{
+    const b=parseInt(document.getElementById('bsel').value);
+    sPort=await navigator.serial.requestPort();
+    await sPort.open({baudRate:b});
+    setStat('CONNECTED WIRED'); setLive(true,'wired'); P0=null;
+    readSerial();
+  }catch(e){setStat('ERR: '+e.message);}
+}
+
+function connWS(){
+  const url=document.getElementById('wsin').value.trim()||'ws://192.168.4.1:81';
+  setStat('CONNECTING...');
+  ws=new WebSocket(url);
+  ws.onopen=()=>{setStat('CONNECTED WIRELESS');setLive(true,'wireless');P0=null;};
+  ws.onmessage=e=>{lbuf+=e.data;procBuf();};
+  ws.onerror=()=>{setStat('WS ERROR');setLive(false);ws=null;};
+  ws.onclose=()=>{setStat('WS CLOSED');setLive(false);ws=null;};
+}
+
+async function doDisc(){
+  try{if(sReader){await sReader.cancel();sReader=null;}if(sPort){await sPort.close();sPort=null;}if(ws){ws.close();ws=null;}}catch(e){}
+  setLive(false);setStat('DISCONNECTED');
+}
+
+function setLive(v,type){
+  document.getElementById('ldot').className='dot'+(v?' live':'');
+  document.getElementById('llbl').textContent=v?'LIVE':'OFFLINE';
+  const btn=document.getElementById('cbtn');
+  btn.textContent=v?'⬡ DISCONNECT':'⬡ CONNECT';
+  btn.className='btn'+(v?' dc':'');
+  const pill=document.getElementById('ctpill');
+  pill.style.display=v?'flex':'none';
+  if(v){
+    document.getElementById('ctdot').className='dot '+(type==='wireless'?'ws':'live');
+    document.getElementById('ctlbl').textContent=type==='wireless'?'WIRELESS':'WIRED';
+  }
+}
+function setStat(t){document.getElementById('cstat').textContent=t;}
+
+async function readSerial(){
+  const dec=new TextDecoderStream();
+  sPort.readable.pipeTo(dec.writable);
+  sReader=dec.readable.getReader();
+  try{while(true){const{value,done}=await sReader.read();if(done)break;lbuf+=value;procBuf();}}
+  catch(e){if(sPort)setStat('READ ERROR');}
+}
+function procBuf(){let nl;while((nl=lbuf.indexOf('\n'))!==-1){const l=lbuf.slice(0,nl).trim();lbuf=lbuf.slice(nl+1);parseLine(l);}}
+
+// =========================================================
+//  PARSE
+// =========================================================
+function parseLine(line){
+  if(!line.startsWith('>')) return;
+  const d={};
+  line.slice(1).split(',').forEach(p=>{const[k,v]=p.split(':');if(k&&v!==undefined)d[k.trim()]=parseFloat(v.trim());});
+  const now=performance.now(), dt=Math.min((now-lastTs)/1000,0.25);
+  lastTs=now;
+  if(!isNaN(d.AX))S.ax=d.AX; if(!isNaN(d.AY))S.ay=d.AY; if(!isNaN(d.AZ))S.az=d.AZ;
+  if(!isNaN(d.GX))S.gx=d.GX; if(!isNaN(d.GY))S.gy=d.GY; if(!isNaN(d.GZ))S.gz=d.GZ;
+  if(!isNaN(d.MX))S.mx=d.MX; if(!isNaN(d.MY))S.my=d.MY; if(!isNaN(d.MZ))S.mz=d.MZ;
+  if(!isNaN(d.T))S.T=d.T;
+  if(!isNaN(d.P))S.P=d.P*1000;
+  intQ(dt); physics(dt); pushH(); doStats();
+  pktCount++;
+}
+
+// =========================================================
+//  QUATERNION INTEGRATION
+// =========================================================
+function intQ(dt){
+  const[qw,qx,qy,qz]=S.q;
+  const gxr=S.gx*Math.PI/180, gyr=S.gy*Math.PI/180, gzr=S.gz*Math.PI/180;
+  const h=dt*0.5;
+  S.q=[
+    qw+h*(-qx*gxr-qy*gyr-qz*gzr),
+    qx+h*(qw*gxr+qy*gzr-qz*gyr),
+    qy+h*(qw*gyr-qx*gzr+qz*gxr),
+    qz+h*(qw*gzr+qx*gyr-qy*gxr)
+  ];
+  const n=Math.hypot(...S.q); S.q=S.q.map(v=>v/n);
+  const[w,x,y,z]=S.q;
+  S.roll=Math.atan2(2*(w*x+y*z),1-2*(x*x+y*y))*180/Math.PI;
+  S.pitch=Math.asin(Math.max(-1,Math.min(1,2*(w*y-z*x))))*180/Math.PI;
+  S.yaw=Math.atan2(2*(w*z+x*y),1-2*(y*y+z*z))*180/Math.PI;
+}
+
+// =========================================================
+//  PHYSICS (dead-reckoning)
+// =========================================================
+function physics(dt){
+  const[w,x,y,z]=S.q;
+  const ax=S.ax,ay=S.ay,az=S.az;
+  // Body→World rotation
+  const wx=(1-2*(y*y+z*z))*ax+2*(x*y-w*z)*ay+2*(x*z+w*y)*az;
+  const wy=2*(x*y+w*z)*ax+(1-2*(x*x+z*z))*ay+2*(y*z-w*x)*az;
+  const wz=2*(x*z-w*y)*ax+2*(y*z+w*x)*ay+(1-2*(x*x+y*y))*az;
+  const nwz=wz-9.81;
+  S.vx+=wx*dt; S.vy+=wy*dt; S.vz+=nwz*dt;
+  S.px+=S.vx*dt; S.py+=S.vy*dt; S.pz+=S.vz*dt;
+
+  if(!P0&&S.P>1000) P0=S.P;
+  const alt=P0&&S.P>0?44330*(1-Math.pow(S.P/P0,1/5.255)):0;
+  H.alt.push(alt); H.alt.shift();
+  document.getElementById('altv').textContent=alt.toFixed(1);
+  H.vs.push(S.vz); H.vs.shift();
+  const gf=Math.hypot(S.ax,S.ay,S.az)/9.81;
+  H.g.push(gf); H.g.shift();
+
+  // Trajectory
+  trajN++;
+  const rate=parseInt(document.getElementById('trajR')?.value||'5');
+  if(trajN%rate===0){
+    trajPts.push([S.px,S.pz,S.py]);
+    if(trajPts.length>2000) trajPts.shift();
+    document.getElementById('tpts').textContent=trajPts.length+' pts';
+  }
+}
+
+function doStats(){
+  const alt=H.alt[H.alt.length-1], g=H.g[H.g.length-1];
+  const spd=Math.hypot(S.vx,S.vy,S.vz), acc=Math.hypot(S.ax,S.ay,S.az);
+  if(alt>stats.mAlt)stats.mAlt=alt;
+  if(acc>stats.mAcc)stats.mAcc=acc;
+  if(spd>stats.mSpd)stats.mSpd=spd;
+  if(g>stats.mG)stats.mG=g;
+  stats.ySum+=Math.abs(S.gz); stats.yN++;
+  document.getElementById('smaxAlt').textContent=stats.mAlt.toFixed(1)+' m';
+  document.getElementById('smaxAcc').textContent=stats.mAcc.toFixed(2)+' m/s²';
+  document.getElementById('smaxSpd').textContent=stats.mSpd.toFixed(2)+' m/s';
+  document.getElementById('smaxG').textContent=stats.mG.toFixed(2)+' g';
+  document.getElementById('stime').textContent=((Date.now()-startTime)/1000).toFixed(1)+' s';
+  document.getElementById('savgY').textContent=(stats.yN>0?(stats.ySum/stats.yN).toFixed(1):0)+' °/s';
+  diagCheck(alt,g);
+}
+
+function diagCheck(alt,g){
+  const msgs=[];
+  if(g>20) msgs.push(['w',`⚠ HIGH G-FORCE: ${g.toFixed(1)}g`]);
+  if(g<0.5&&(sPort||ws)) msgs.push(['w',`⚠ LOW-G: ${g.toFixed(2)}g — FREEFALL/SENSOR ERR`]);
+  if(Math.abs(S.T)>60) msgs.push(['w',`⚠ TEMPERATURE: ${S.T.toFixed(1)}°C`]);
+  if(Math.abs(S.gx)>500||Math.abs(S.gy)>500||Math.abs(S.gz)>500) msgs.push(['w','⚠ GYRO SATURATING']);
+  if(alt>50) msgs.push(['ok',`◉ ALT ${alt.toFixed(0)}m AGL — ASCENDING`]);
+  if(!msgs.length) msgs.push(['ok','✓ ALL SYSTEMS NOMINAL']);
+  document.getElementById('dpanel').innerHTML=msgs.map(([t,m])=>`<div class="${t==='w'?'dw':'dok'}">${m}</div>`).join('');
+}
+
+function pushH(){
+  H.ax.push(S.ax);H.ax.shift(); H.ay.push(S.ay);H.ay.shift(); H.az.push(S.az);H.az.shift();
+  H.gx.push(S.gx);H.gx.shift(); H.gy.push(S.gy);H.gy.shift(); H.gz.push(S.gz);H.gz.shift();
+}
+
+function resetQ(){S.q=[1,0,0,0];S.roll=0;S.pitch=0;S.yaw=0;}
+function zeroAll(){S.q=[1,0,0,0];S.vx=0;S.vy=0;S.vz=0;S.px=0;S.py=0;S.pz=0;}
+function clearTraj(){trajPts=[];stats={mAlt:0,mAcc:0,mSpd:0,mG:0,ySum:0,yN:0};}
+function resetView(){tvx=-0.4;tvy=0.5;}
+function autoP0(){if(S.P>1000){P0=S.P;document.getElementById('p0in').value=(S.P/100).toFixed(2);}}
+
+// =========================================================
+//  DEMO
+// =========================================================
+let dt=0;
+function demo(){
+  if(sPort||ws)return;
+  dt+=0.033;
+  S.gx=Math.sin(dt*1.1)*14; S.gy=Math.cos(dt*0.85)*22; S.gz=Math.sin(dt*0.55)*8;
+  S.ax=Math.sin(dt*0.9)*3.5; S.ay=Math.cos(dt*0.7)*2.5; S.az=9.81+Math.sin(dt*2.1)*1.8;
+  S.mx=Math.cos(dt*0.14)*400; S.my=Math.sin(dt*0.14)*300; S.mz=160;
+  S.T=22+Math.sin(dt*0.04)*0.4; S.P=101000+Math.sin(dt*0.18)*900;
+  intQ(0.033); physics(0.033); pushH(); doStats();
+}
+
+// =========================================================
+//  MATH HELPERS
+// =========================================================
+function qToM(q){
+  const[w,x,y,z]=q;
+  return[1-2*(y*y+z*z),2*(x*y-w*z),2*(x*z+w*y),
+         2*(x*y+w*z),1-2*(x*x+z*z),2*(y*z-w*x),
+         2*(x*z-w*y),2*(y*z+w*x),1-2*(x*x+y*y)];
+}
+function mv(m,v){return[m[0]*v[0]+m[1]*v[1]+m[2]*v[2],m[3]*v[0]+m[4]*v[1]+m[5]*v[2],m[6]*v[0]+m[7]*v[1]+m[8]*v[2]];}
+function mm(a,b){const r=new Array(9).fill(0);for(let i=0;i<3;i++)for(let j=0;j<3;j++)for(let k=0;k<3;k++)r[i*3+j]+=a[i*3+k]*b[k*3+j];return r;}
+function rX(a){const c=Math.cos(a),s=Math.sin(a);return[1,0,0,0,c,-s,0,s,c];}
+function rY(a){const c=Math.cos(a),s=Math.sin(a);return[c,0,s,0,1,0,-s,0,c];}
+function aaQ(ax,ay,az,angle){const s=Math.sin(angle/2),n=Math.hypot(ax,ay,az)||1;return[Math.cos(angle/2),ax/n*s,ay/n*s,az/n*s];}
+function mulQQ(a,b){return[a[0]*b[0]-a[1]*b[1]-a[2]*b[2]-a[3]*b[3],a[0]*b[1]+a[1]*b[0]+a[2]*b[3]-a[3]*b[2],a[0]*b[2]-a[1]*b[3]+a[2]*b[0]+a[3]*b[1],a[0]*b[3]+a[1]*b[2]-a[2]*b[1]+a[3]*b[0]];}
+function normQ(q){const n=Math.hypot(...q);return q.map(v=>v/n);}
+
+// =========================================================
+//  ROCKET GEOMETRY
+// =========================================================
+function buildRocket(){
+  const verts=[],edges=[];
+  const n=16,R=0.11,y0=-0.44,y1=0.44;
+  for(let ring=0;ring<2;ring++){
+    const y=ring?y1:y0;
+    for(let i=0;i<n;i++){const a=(i/n)*Math.PI*2;verts.push([Math.cos(a)*R,y,Math.sin(a)*R]);}
+  }
+  for(let i=0;i<n;i++){edges.push([i,(i+1)%n,'body']);edges.push([n+i,n+(i+1)%n,'body']);edges.push([i,n+i,'body']);}
+  // Shoulder + nosecone
+  const sr=R*0.82,sy=y1+0.12,si=verts.length;
+  for(let i=0;i<n;i++){const a=(i/n)*Math.PI*2;verts.push([Math.cos(a)*sr,sy,Math.sin(a)*sr]);}
+  for(let i=0;i<n;i++){edges.push([n+i,si+i,'body']);edges.push([si+i,si+(i+1)%n,'nose']);}
+  const tip=verts.length; verts.push([0,0.84,0]);
+  for(let i=0;i<n;i++) edges.push([si+i,tip,'nose']);
+  // Nozzle
+  const nzy=y0-0.06,nzr=0.078,nbt=y0-0.22,nbr=0.054,nz0=verts.length;
+  for(let i=0;i<8;i++){const a=(i/8)*Math.PI*2;verts.push([Math.cos(a)*nzr,nzy,Math.sin(a)*nzr]);}
+  const nzb=verts.length;
+  for(let i=0;i<8;i++){const a=(i/8)*Math.PI*2;verts.push([Math.cos(a)*nbr,nbt,Math.sin(a)*nbr]);}
+  for(let i=0;i<8;i++){
+    edges.push([nz0+i,nz0+(i+1)%8,'nozzle']);edges.push([nzb+i,nzb+(i+1)%8,'nozzle']);
+    edges.push([nz0+i,nzb+i,'nozzle']);
+    const bi=Math.round(i*n/8)%n; edges.push([bi,nz0+i,'nozzle']);
+  }
+  // Fins
+  [0,90,180,270].forEach(fa=>{
+    const a=fa*Math.PI/180,rx=Math.cos(a)*R,rz=Math.sin(a)*R,ox=Math.cos(a)*0.27,oz=Math.sin(a)*0.27;
+    const fi=verts.length;
+    verts.push([rx,y0,rz],[rx,y0+0.2,rz],[rx+ox,y0-0.23,rz+oz],[rx+ox,y0+0.04,rz+oz]);
+    edges.push([fi,fi+1,'fin'],[fi,fi+2,'fin'],[fi+1,fi+3,'fin'],[fi+2,fi+3,'fin'],[fi+1,fi+2,'fin']);
+  });
+  return{verts,edges};
+}
+const RGEO=buildRocket();
+
+// Rocket canvas
+const RC=document.getElementById('rc');
+const rctx=RC.getContext('2d');
+function resizeRC(){const dpr=window.devicePixelRatio||1;RC.width=RC.offsetWidth*dpr;RC.height=RC.offsetHeight*dpr;}
+resizeRC(); window.addEventListener('resize',resizeRC);
+
+// Drag
+RC.addEventListener('mousedown',e=>{rdrag=true;rdlast={x:e.clientX,y:e.clientY};rdq=[...S.q];});
+RC.addEventListener('mousemove',e=>{
+  if(!rdrag||!rdlast)return;
+  const dx=(e.clientX-rdlast.x)*0.012, dy=(e.clientY-rdlast.y)*0.012;
+  rdlast={x:e.clientX,y:e.clientY};
+  // Apply delta rotation in world space
+  const qy=aaQ(0,1,0,dx), qx=aaQ(1,0,0,dy);
+  rdq=normQ(mulQQ(mulQQ(qy,qx),rdq));
+});
+RC.addEventListener('mouseup',()=>{if(rdrag){S.q=[...rdq];}rdrag=false;rdlast=null;});
+RC.addEventListener('mouseleave',()=>{rdrag=false;rdlast=null;});
+RC.addEventListener('touchstart',e=>{const t=e.touches[0];rdrag=true;rdlast={x:t.clientX,y:t.clientY};rdq=[...S.q];e.preventDefault();},{passive:false});
+RC.addEventListener('touchmove',e=>{
+  const t=e.touches[0];if(!rdlast)return;
+  const dx=(t.clientX-rdlast.x)*0.012,dy=(t.clientY-rdlast.y)*0.012;
+  rdlast={x:t.clientX,y:t.clientY};
+  rdq=normQ(mulQQ(mulQQ(aaQ(0,1,0,dx),aaQ(1,0,0,dy)),rdq));
+},{passive:false});
+RC.addEventListener('touchend',()=>{if(rdrag)S.q=[...rdq];rdrag=false;rdlast=null;});
+
+function drawRocket(){
+  const dpr=window.devicePixelRatio||1;
+  const W=RC.width/dpr,H=RC.height/dpr;
+  rctx.setTransform(dpr,0,0,dpr,0,0);
+  rctx.clearRect(0,0,W,H);
+  rctx.fillStyle='#07090f';rctx.fillRect(0,0,W,H);
+  // Grid
+  rctx.strokeStyle='#0d1830';rctx.lineWidth=.5;
+  for(let x=0;x<W;x+=28){rctx.beginPath();rctx.moveTo(x,0);rctx.lineTo(x,H);rctx.stroke();}
+  for(let y=0;y<H;y+=28){rctx.beginPath();rctx.moveTo(0,y);rctx.lineTo(W,y);rctx.stroke();}
+
+  const q=rdrag?rdq:S.q;
+  const R=qToM(q);
+  // Fixed camera — slight tilt for 3/4 view
+  const cam=mm(rX(-0.32),rY(0.42));
+  const TR=mm(cam,R);
+
+  const cx=W/2,cy=H/2,sc=Math.min(W,H)*0.30;
+
+  const proj=RGEO.verts.map(v=>{
+    const rv=mv(TR,v);
+    const zd=rv[2]+3.6;
+    return{w:rv,s:[cx+(rv[0]/zd)*sc*2,cy-(rv[1]/zd)*sc*2]};
+  });
+
+  const sorted=RGEO.edges.map(e=>({e,z:(proj[e[0]].w[2]+proj[e[1]].w[2])/2})).sort((a,b)=>a.z-b.z);
+
+  const COLS={
+    body:['#c8d4ff','#c8d4ff'],nose:['#f0f4ff','#f0f4ff'],
+    fin:['#cc2222','#8b0000'],nozzle:['#4a5bbf','#2d3a8c']
+  };
+
+  sorted.forEach(({e})=>{
+    const[i,j,type]=e;
+    const[col]=COLS[type]||COLS.body;
+    const dz=(proj[i].w[2]+proj[j].w[2])/2;
+    const alpha=Math.max(0.12,Math.min(0.95,0.75-dz*0.22));
+    rctx.globalAlpha=alpha;
+    rctx.beginPath();rctx.moveTo(proj[i].s[0],proj[i].s[1]);rctx.lineTo(proj[j].s[0],proj[j].s[1]);
+    rctx.strokeStyle=col;rctx.lineWidth=type==='body'||type==='nose'?1.3:1;
+    rctx.shadowColor=col;rctx.shadowBlur=7;rctx.stroke();
+  });
+  rctx.globalAlpha=1;rctx.shadowBlur=0;
+
+  // Axis gizmo
+  const ax=W-52,ay=H-52,asc=26;
+  [[[1,0,0],'X','#cc3333'],[[0,1,0],'Y','#2d8bcc'],[[0,0,1],'Z','#b89a00']].forEach(([v,l,c])=>{
+    const rv=mv(cam,v);
+    rctx.beginPath();rctx.moveTo(ax,ay);rctx.lineTo(ax+rv[0]*asc,ay-rv[1]*asc);
+    rctx.strokeStyle=c;rctx.lineWidth=1.5;rctx.stroke();
+    rctx.font='9px Share Tech Mono';rctx.fillStyle=c;rctx.fillText(l,ax+rv[0]*asc+3,ay-rv[1]*asc+3);
+  });
+}
+
+// =========================================================
+//  TRAJECTORY
+// =========================================================
+const TC=document.getElementById('tc');
+const tctx=TC.getContext('2d');
+function resizeTC(){const dpr=window.devicePixelRatio||1;TC.width=TC.offsetWidth*dpr;TC.height=TC.offsetHeight*dpr;}
+resizeTC(); window.addEventListener('resize',resizeTC);
+
+TC.addEventListener('mousedown',e=>{tdrag=true;tdlast={x:e.clientX,y:e.clientY};});
+TC.addEventListener('mousemove',e=>{
+  if(!tdrag||!tdlast)return;
+  tvy+=(e.clientX-tdlast.x)*0.008; tvx+=(e.clientY-tdlast.y)*0.008;
+  tdlast={x:e.clientX,y:e.clientY};
+});
+TC.addEventListener('mouseup',()=>tdrag=false);
+TC.addEventListener('mouseleave',()=>tdrag=false);
+
+function drawTraj(){
+  const dpr=window.devicePixelRatio||1;
+  const W=TC.width/dpr,H=TC.height/dpr;
+  tctx.setTransform(dpr,0,0,dpr,0,0);
+  tctx.clearRect(0,0,W,H);
+  tctx.fillStyle='#07090f';tctx.fillRect(0,0,W,H);
+
+  const cam=mm(rX(tvx),rY(tvy));
+  const cx=W/2,cy=H*0.58,sc=Math.min(W,H)*0.24;
+
+  function p3(pt){
+    const rv=mv(cam,pt),zd=rv[2]+6;
+    return[cx+(rv[0]/zd)*sc*2,cy-(rv[1]/zd)*sc*2,rv[2]];
+  }
+
+  // Floor grid
+  const gr=5,gs=22;
+  tctx.strokeStyle='#0d1830';tctx.lineWidth=.5;
+  for(let i=-gr;i<=gr;i++){
+    const pa=p3([i*gs/gr,-0.01,gr*gs/gr]),pb=p3([i*gs/gr,-0.01,-gr*gs/gr]);
+    const pc=p3([gr*gs/gr,-0.01,i*gs/gr]),pd=p3([-gr*gs/gr,-0.01,i*gs/gr]);
+    tctx.beginPath();tctx.moveTo(pa[0],pa[1]);tctx.lineTo(pb[0],pb[1]);tctx.stroke();
+    tctx.beginPath();tctx.moveTo(pc[0],pc[1]);tctx.lineTo(pd[0],pd[1]);tctx.stroke();
+  }
+
+  // World axes
+  [[[30,0,0],'X +','#cc3333'],[[0,30,0],'Y +','#2d8bcc'],[[0,0,30],'Z +','#b89a00']].forEach(([v,l,c])=>{
+    const p0=p3([0,0,0]),p1=p3(v);
+    tctx.beginPath();tctx.moveTo(p0[0],p0[1]);tctx.lineTo(p1[0],p1[1]);
+    tctx.strokeStyle=c;tctx.lineWidth=1.5;tctx.stroke();
+    tctx.font='10px Share Tech Mono';tctx.fillStyle=c;tctx.fillText(l,p1[0]+3,p1[1]+3);
+  });
+
+  if(trajPts.length<2){
+    tctx.font='13px Share Tech Mono';tctx.fillStyle='#1a2550';tctx.textAlign='center';
+    tctx.fillText('AWAITING FLIGHT DATA',W/2,H/2);tctx.textAlign='left';
+    return;
+  }
+
+  // Fit to view
+  let mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9,mnz=1e9,mxz=-1e9;
+  trajPts.forEach(([x,y,z])=>{if(x<mnx)mnx=x;if(x>mxx)mxx=x;if(y<mny)mny=y;if(y>mxy)mxy=y;if(z<mnz)mnz=z;if(z>mxz)mxz=z;});
+  const span=Math.max(mxx-mnx,mxy-mny,mxz-mnz,.1);
+  const scl=28/span, ocx=(mnx+mxx)/2, ocy=(mny+mxy)/2, ocz=(mnz+mxz)/2;
+
+  const pts2=trajPts.map(([x,y,z])=>p3([(x-ocx)*scl,(y-ocy)*scl,(z-ocz)*scl]));
+
+  // Draw path with time-based colour gradient navy→royal→crimson
+  for(let i=1;i<pts2.length;i++){
+    const t=i/pts2.length;
+    // navy(10,21,64) → royal(45,58,140) → crimson(139,0,0) → white(200,210,255)
+    let r,g,b;
+    if(t<0.33){const f=t/0.33;r=10+f*35;g=21+f*37;b=64+f*76;}
+    else if(t<0.66){const f=(t-.33)/.33;r=45+f*94;g=58-f*58;b=140-f*140;}
+    else{const f=(t-.66)/.34;r=139+f*61;g=0+f*200;b=0+f*230;}
+    tctx.beginPath();tctx.moveTo(pts2[i-1][0],pts2[i-1][1]);tctx.lineTo(pts2[i][0],pts2[i][1]);
+    tctx.strokeStyle=`rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+    tctx.lineWidth=2;tctx.stroke();
+  }
+
+  // End dot
+  const last=pts2[pts2.length-1];
+  tctx.beginPath();tctx.arc(last[0],last[1],5,0,Math.PI*2);
+  tctx.fillStyle='#cc3333';tctx.shadowColor='#cc3333';tctx.shadowBlur=10;tctx.fill();tctx.shadowBlur=0;
+  // Start dot
+  tctx.beginPath();tctx.arc(pts2[0][0],pts2[0][1],4,0,Math.PI*2);
+  tctx.fillStyle='#2d8bcc';tctx.fill();
+
+  // Legend
+  tctx.font='9px Share Tech Mono';
+  tctx.fillStyle='#2d8bcc';tctx.fillText('● LAUNCH',12,H-28);
+  tctx.fillStyle='#cc3333';tctx.fillText('● CURRENT',12,H-16);
+}
+
+// =========================================================
+//  COMPASS
+// =========================================================
+function drawCompass(hdg){
+  const c=document.getElementById('cmpC'),ctx=c.getContext('2d');
+  const W=130,H=130,cx=65,cy=65,r=56;
+  ctx.clearRect(0,0,W,H);ctx.fillStyle='#07090f';ctx.fillRect(0,0,W,H);
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.strokeStyle='#1a2550';ctx.lineWidth=1.5;ctx.stroke();
+  for(let i=0;i<36;i++){
+    const a=(i*10-hdg)*Math.PI/180-Math.PI/2;
+    const inner=i%9===0?r-13:r-7;
+    ctx.beginPath();ctx.moveTo(cx+Math.cos(a)*inner,cy+Math.sin(a)*inner);ctx.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);
+    ctx.strokeStyle=i%9===0?'#2d3a8c':'#1a2550';ctx.lineWidth=i%9===0?2:1;ctx.stroke();
+  }
+  ['N','E','S','W'].forEach((l,i)=>{
+    const a=(i*90-hdg)*Math.PI/180-Math.PI/2;
+    ctx.font=l==='N'?'bold 11px Share Tech Mono':'9px Share Tech Mono';
+    ctx.fillStyle=l==='N'?'#cc3333':'#3a4870';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(l,cx+Math.cos(a)*(r-12),cy+Math.sin(a)*(r-12));
+  });
+  const na=-Math.PI/2;
+  ctx.beginPath();ctx.moveTo(cx+Math.cos(na)*(r-16),cy+Math.sin(na)*(r-16));
+  ctx.lineTo(cx+Math.cos(na+.24)*8,cy+Math.sin(na+.24)*8);ctx.lineTo(cx,cy);
+  ctx.lineTo(cx+Math.cos(na-.24)*8,cy+Math.sin(na-.24)*8);ctx.closePath();
+  ctx.fillStyle='#cc3333';ctx.shadowColor='#cc3333';ctx.shadowBlur=8;ctx.fill();ctx.shadowBlur=0;
+  ctx.beginPath();ctx.arc(cx,cy,3,0,Math.PI*2);ctx.fillStyle='#f0f4ff';ctx.fill();
+}
+
+// =========================================================
+//  SPARKLINES
+// =========================================================
+function spark(id,data,col,lo,hi){
+  const c=document.getElementById(id);if(!c)return;
+  const dpr=window.devicePixelRatio||1;
+  const W=c.offsetWidth,Hh=c.offsetHeight;
+  if(c.width!==W*dpr){c.width=W*dpr;c.height=Hh*dpr;}
+  const ctx=c.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,Hh);ctx.fillStyle='#070c14';ctx.fillRect(0,0,W,Hh);
+  const rng=hi-lo||1;
+  const zy=Hh-((0-lo)/rng)*Hh;
+  ctx.strokeStyle='#0d1830';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,zy);ctx.lineTo(W,zy);ctx.stroke();
+  ctx.beginPath();ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.shadowColor=col;ctx.shadowBlur=5;
+  for(let i=0;i<data.length;i++){const x=(i/(data.length-1))*W,y=Hh-((data[i]-lo)/rng)*Hh;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+  ctx.stroke();ctx.shadowBlur=0;ctx.setTransform(1,0,0,1,0,0);
+}
+
+// =========================================================
+//  BAR
+// =========================================================
+function bar(id,val,max){
+  const el=document.getElementById(id);if(!el)return;
+  const p=Math.min(Math.abs(val)/max,1)*50;
+  el.style.left=val>=0?'50%':(50-p)+'%';el.style.width=p+'%';
+}
+
+// =========================================================
+//  MAIN LOOP
+// =========================================================
+function loop(){
+  if(!sPort&&!ws) demo();
+
+  // Clock
+  const el2=(Date.now()-startTime)/1000;
+  document.getElementById('hclock').textContent=`T+${Math.floor(el2/60).toString().padStart(2,'0')}:${(el2%60).toFixed(1).padStart(4,'0')}`;
+
+  // Pkt rate
+  const now=Date.now(),e2=(now-pktTs)/1000;
+  if(e2>=.5){document.getElementById('pktr').textContent=(pktCount/e2).toFixed(1);pktCount=0;pktTs=now;}
+
+  // Euler
+  document.getElementById('eroll').textContent=S.roll.toFixed(1)+'°';
+  document.getElementById('epitch').textContent=S.pitch.toFixed(1)+'°';
+  document.getElementById('eyaw').textContent=S.yaw.toFixed(1)+'°';
+
+  // Accel
+  bar('axb',S.ax,60);document.getElementById('axv').textContent=S.ax.toFixed(3);
+  bar('ayb',S.ay,60);document.getElementById('ayv').textContent=S.ay.toFixed(3);
+  bar('azb',S.az,60);document.getElementById('azv').textContent=S.az.toFixed(3);
+  spark('spAX',H.ax,'#cc3333',-20,20);spark('spAY',H.ay,'#2d8bcc',-20,20);spark('spAZ',H.az,'#b89a00',0,25);
+
+  // Gyro
+  bar('gxb',S.gx,200);document.getElementById('gxv').textContent=S.gx.toFixed(2);
+  bar('gyb',S.gy,200);document.getElementById('gyv').textContent=S.gy.toFixed(2);
+  bar('gzb',S.gz,200);document.getElementById('gzv').textContent=S.gz.toFixed(2);
+  spark('spGX',H.gx,'#cc3333',-200,200);spark('spGY',H.gy,'#2d8bcc',-200,200);spark('spGZ',H.gz,'#b89a00',-200,200);
+
+  // Mag + compass
+  bar('mxb',S.mx,600);document.getElementById('mxv').textContent=Math.round(S.mx);
+  bar('myb',S.my,600);document.getElementById('myv').textContent=Math.round(S.my);
+  bar('mzb',S.mz,600);document.getElementById('mzv').textContent=Math.round(S.mz);
+  const hdg=(Math.atan2(S.my,S.mx)*180/Math.PI+360)%360;
+  document.getElementById('hdgBig').textContent=hdg.toFixed(1)+'°';
+  drawCompass(hdg);
+
+  // Baro
+  document.getElementById('presv').textContent=(S.P/1000).toFixed(3);
+  document.getElementById('tempv').textContent=S.T.toFixed(2);
+  spark('spAlt',H.alt,'#2d3a8c',-5,300);
+
+  // Diag sparklines
+  spark('spVS',H.vs,'#2d8bcc',-30,60);
+  spark('spG',H.g,'#cc3333',0,30);
+
+  drawRocket();
+  drawTraj();
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
